@@ -40,15 +40,25 @@ function dtnj_svg_inliner($content) {
 	if ( is_single() && !empty($content) ) {
 	
 		$dom = new DOMDocument();
+ 		libxml_use_internal_errors(true);
 		$dom->loadHTML($content);
-		$imgs = $dom->getElementsByTagName('img');
+ 		libxml_clear_errors();
 		
+		/* Conversion from a DOMNodeList (http://php.net/manual/en/class.domnodelist.php) to a simple Array.
+		 * I can't iterate over the DOMNodeList directly, because I remove the node inside the loop and DOMNodeList behaves as a generator.
+		 */
+		$imgs = Array();
+		foreach ( $dom->getElementsByTagName('img') as $img ) {
+			$imgs[] = $img;
+		}
+		
+		/* Now I can iterate over the array */
 		foreach ( $imgs as $img ) {
 		
 			$src = $img->getAttribute('src');
 			if ( $src && substr( $src, -strlen( $ext ) ) == $ext ) {
 				$svg = $dom->createDocumentFragment();
-				$svg->appendXML( file_get_contents( ABSPATH . wp_make_link_relative( $src ) ) );
+				$svg->appendXML( preg_replace( '#<\?xml[^>]+\?>#', '', file_get_contents( ABSPATH . wp_make_link_relative( $src ) ) ) );
 				$img->parentNode->replaceChild( $svg , $img );
 			}
 			
@@ -62,4 +72,4 @@ function dtnj_svg_inliner($content) {
 	
 }
 
-add_filter( 'the_content', 'dtnj_svg_inliner' );
+add_filter( 'the_content', 'dtnj_svg_inliner', 999 );
