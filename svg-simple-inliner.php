@@ -20,15 +20,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Global variables
- */
-$svgs_plugin_version = '0.1.0';									// for use on admin pages
-$plugin_file = plugin_basename(__FILE__);							// plugin file for reference
-define( 'DTNJ_SVGS_PLUGIN_PATH', plugin_dir_path( __FILE__ ) );	// define the absolute plugin path for includes
-define( 'DTNJ_SVGS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );		// define the plugin url for use in enqueue
-$dtnj_svgs_options = get_option('dtnj_svgs_settings');			// retrieve our plugin settings from the options table
-
-/**
  * Replace img tag including svg image with svg content.
  *
  * @uses is_single()
@@ -41,7 +32,7 @@ function dtnj_svg_inliner($content) {
 	
 		$dom = new DOMDocument();
  		libxml_use_internal_errors(true);
-		$dom->loadHTML($content);
+		$dom->loadHTML(mb_convert_encoding($content, 'HTML-ENTITIES', 'UTF-8'));
  		libxml_clear_errors();
 		
 		/* Conversion from a DOMNodeList (http://php.net/manual/en/class.domnodelist.php) to a simple Array.
@@ -58,9 +49,58 @@ function dtnj_svg_inliner($content) {
 			$src = $img->getAttribute('src');
 			if ( $src && substr( $src, -strlen( $ext ) ) == $ext ) {
 				$svg = $dom->createDocumentFragment();
-				$svg->appendXML( preg_replace( '#<\?xml[^>]+\?>#', '', file_get_contents( ABSPATH . wp_make_link_relative( $src ) ) ) );
+				$svg->appendXML(
+					preg_replace(
+						'#<\?xml[^>]+\?>#',
+						'',
+						mb_convert_encoding( file_get_contents( ABSPATH . wp_make_link_relative( $src ) ), 'HTML-ENTITIES', 'UTF-8' )
+					)
+				);
 				$img->parentNode->replaceChild( $svg , $img );
 			}
+			
+		}
+		
+		$svgs = $dom->getElementsByTagName('svg');
+		foreach ( $svgs as $svg ) {
+		
+			$viewBox = array_map(
+				'floatval',
+				explode( ' ', $svg->getAttribute('viewBox') ?: "0 0 0 0" )
+			);
+			
+			$dimensions = Array(
+				floatval($svg->getAttribute('width') ?: '0'),
+				floatval($svg->getAttribute('height') ?: '0')
+			);
+			
+			if ( !$viewBox[2] && $dimensions[0] ) {
+				$viewBox[2] = $dimensions[0];
+			}
+			
+			if ( !$viewBox[3] && $dimensions[1] ) {
+				$viewBox[3] = $dimensions[1];
+			}
+			
+			$width = $viewBox[2] - $viewBox[0];
+			$height = $viewBox[3] - $viewBox[1];
+			$aspectRatio = $width / $height;
+			
+			$svg->removeAttribute('width');
+			$svg->removeAttribute('height');
+			$svg->setAttribute( 'viewBox', implode( ' ', $viewBox ) );
+			$svg->setAttribute( 'preserveAspectRatio', 'xMidYMid meet' );
+			
+			$svg_classes = explode( ' ', $svg->getAttribute('class') );
+			array_push( $svg_classes, 'svg-content' );
+			$container_classes = explode( ' ', $svg->parentNode->getAttribute('class') );
+			array_push( $container_classes, 'svg-container' );
+			
+			$svg->setAttribute( 'class', implode( ' ', array_unique($svg_classes) ) );
+			$svg->parentNode->setAttribute( 'class', implode( ' ', array_unique($container_classes) ) );
+			$svg->parentNode->setAttribute( 'data-width', $width );
+			$svg->parentNode->setAttribute( 'data-height', $height );
+			$svg->parentNode->setAttribute( 'data-aspect-ratio', $aspectRatio );
 			
 		}
 		
