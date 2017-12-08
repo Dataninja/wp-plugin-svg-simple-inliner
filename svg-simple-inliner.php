@@ -28,7 +28,7 @@ function dtnj_svg_inliner($content) {
 
 	$ext = '.svg';
 
-	if ( is_single() && !empty($content) ) {
+	if ( !empty($content) ) {
 	
 		$dom = new DOMDocument();
  		libxml_use_internal_errors(true);
@@ -46,14 +46,16 @@ function dtnj_svg_inliner($content) {
 		/* Now I can iterate over the array */
 		foreach ( $imgs as $img ) {
 		
+			$current_site = get_blog_details(get_current_blog_id());
 			$src = $img->getAttribute('src');
 			if ( $src && substr( $src, -strlen( $ext ) ) == $ext ) {
 				$svg = $dom->createDocumentFragment();
+				$svg_path = ABSPATH . str_replace( $current_site->path , "" , wp_make_link_relative( $src ) );
 				$svg->appendXML(
 					preg_replace(
 						'#<\?xml[^>]+\?>#',
 						'',
-						mb_convert_encoding( file_get_contents( ABSPATH . wp_make_link_relative( $src ) ), 'HTML-ENTITIES', 'UTF-8' )
+						mb_convert_encoding( file_get_contents( $svg_path ), 'HTML-ENTITIES', 'UTF-8' )
 					)
 				);
 				$img->parentNode->replaceChild( $svg , $img );
