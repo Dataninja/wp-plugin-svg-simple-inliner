@@ -48,23 +48,43 @@ function dtnj_svg_inliner($content) {
 		
 			$current_site = get_blog_details(get_current_blog_id());
 			$src = $img->getAttribute('src');
+			$img_classes = explode( ' ', $img->getAttribute('class') );
+			$container = $img->parentNode;
+			
 			if ( $src && substr( $src, -strlen( $ext ) ) == $ext ) {
-				$svg = $dom->createDocumentFragment();
+			
+				$fragment = $dom->createDocumentFragment();
 				$svg_path = ABSPATH . str_replace( $current_site->path , "" , wp_make_link_relative( $src ) );
-				$svg->appendXML(
+				$fragment->appendXML(
 					preg_replace(
 						'#<\?xml[^>]+\?>#',
 						'',
 						mb_convert_encoding( file_get_contents( $svg_path ), 'HTML-ENTITIES', 'UTF-8' )
 					)
 				);
-				$img->parentNode->replaceChild( $svg , $img );
+				
+				$container->replaceChild( $fragment , $img );
+				
+				$svg = $container->getElementsByTagName('svg')[0];
+				
+				$svg_classes = explode( ' ', $svg->getAttribute('class') );
+				array_push( $svg_classes, 'svg-content' );
+				$svg->setAttribute( 'class' , implode( ' ', array_unique( array_merge( $svg_classes , $img_classes ) ) ) );
+				
+				$container_classes = explode( ' ', $container->getAttribute('class') );
+				array_push( $container_classes, 'svg-container' );
+				$container->setAttribute( 'class', implode( ' ', array_unique($container_classes) ) );
+
 			}
 			
 		}
 		
 		$svgs = $dom->getElementsByTagName('svg');
 		foreach ( $svgs as $svg ) {
+		
+			if ( strpos( $svg->getAttribute('class') , 'svg-content' ) === false ) {
+				continue;
+			}
 		
 			$viewBox = array_map(
 				'floatval',
@@ -93,13 +113,6 @@ function dtnj_svg_inliner($content) {
 			$svg->setAttribute( 'viewBox', implode( ' ', $viewBox ) );
 			$svg->setAttribute( 'preserveAspectRatio', 'xMidYMid meet' );
 			
-			$svg_classes = explode( ' ', $svg->getAttribute('class') );
-			array_push( $svg_classes, 'svg-content' );
-			$container_classes = explode( ' ', $svg->parentNode->getAttribute('class') );
-			array_push( $container_classes, 'svg-container' );
-			
-			$svg->setAttribute( 'class', implode( ' ', array_unique($svg_classes) ) );
-			$svg->parentNode->setAttribute( 'class', implode( ' ', array_unique($container_classes) ) );
 			$svg->parentNode->setAttribute( 'data-width', $width );
 			$svg->parentNode->setAttribute( 'data-height', $height );
 			$svg->parentNode->setAttribute( 'data-aspect-ratio', $aspectRatio );
